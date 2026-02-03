@@ -32,10 +32,6 @@ def visualize(image_path, mask_path, output_path, alpha=0.7):
     # 读取原图和掩码
     image = Image.open(image_path).convert('RGB')
     mask = Image.open(mask_path).convert('L')
-    # img = Image.fromarray(np.array(image_path))
-
-    # 叠加
-    # ego_pred = overlay_mask(img, ego_pred, alpha=0.5)
     result = overlay_mask(image, mask, alpha=alpha)
     result.save(output_path)
     print(f"已保存: {output_path}")
@@ -43,9 +39,9 @@ def visualize(image_path, mask_path, output_path, alpha=0.7):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='掩码可视化')
-    parser.add_argument('-i', '--image', required=True, help='原图路径')
-    parser.add_argument('-m', '--mask', required=True, help='掩码图路径')
-    parser.add_argument('-o', '--output', required=True, help='输出路径')
+    parser.add_argument('-i', '--image', default='/root/autodl-tmp/OOAL/data/source/screen/screen5.jpg', help='原图路径')
+    parser.add_argument('-m', '--mask', default='/root/autodl-tmp/OOAL/data/temps/2/GT/display/screen/screen5.png', help='掩码图路径')
+    parser.add_argument('-o', '--output', default='/root/autodl-tmp/OOAL/data/temps/screen5_vis.png', help='输出路径')
     parser.add_argument('-a', '--alpha', type=float, default=0.5, help='原图透明度(0-1)')
 
     args = parser.parse_args()

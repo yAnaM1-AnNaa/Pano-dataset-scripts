@@ -71,16 +71,14 @@ def process_json_file(input_path, output_path, point_spacing=1):
         output_path: 输出json文件路径
         point_spacing: 点之间的间距
     """
-    # 读取json文件
     with open(input_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
-    # 获取图像尺寸
     image_width = data.get('imageWidth')
     image_height = data.get('imageHeight')
 
     if image_width is None or image_height is None:
-        print(f"警告: {input_path} 缺少图像尺寸信息，跳过处理")
+        print(f"Warning: {input_path} lacks width or height information. Skipping.")
         return False
 
     # 处理每个shape
@@ -112,7 +110,7 @@ def process_json_file(input_path, output_path, point_spacing=1):
                     'original_shape_type': 'polygon'
                 }
                 new_shapes.append(new_shape)
-                print(f"  转换多边形 '{shape.get('label')}': {len(polygon_points)} 顶点 -> {len(dense_points)} 个点")
+                print(f"  Converted polygon '{shape.get('label')}': {len(polygon_points)} vertices -> {len(dense_points)} points")
             else:
                 # 多边形顶点不足，保持原样
                 new_shapes.append(shape)
@@ -168,7 +166,7 @@ def process_folder(input_folder, output_folder, point_spacing=1):
         # 只保留文件名，输出到同一目录
         json_file = os.path.basename(input_path)
         obj_name = input_path.split('/')[-2]
-        output_path = os.path.join(output_folder, obj_name, json_file)
+        output_path = os.path.join(output_folder, json_file)
 
         print(f"处理: {input_path}")
 
@@ -181,24 +179,25 @@ def process_folder(input_folder, output_folder, point_spacing=1):
             print(f"  错误: {e}")
             fail_count += 1
 
-    print(f"\n处理完成: 成功 {success_count} 个, 失败 {fail_count} 个")
-    print(f"输出目录: {output_folder}")
+    print(f"\nProcessing completed: {success_count} succeeded, {fail_count} failed")
+    print(f"Output directory: {output_folder}")
 
 
 def main():
     parser = argparse.ArgumentParser(description='将labelme多边形标注转换为密集点阵')
-    parser.add_argument('--input', '-i', default='/root/autodl-tmp/OOAL/data/source/armset', help='输入文件夹路径')
-    parser.add_argument('--output', '-o', default='/root/autodl-tmp/OOAL/data/tobeprocess', help='输出文件夹路径')
+    parser.add_argument('--input', '-i', default='./data/temps/Shrinked', help='输入文件夹路径')
+    parser.add_argument('--output', '-o', default='./data/temps/Spotted', help='输出文件夹路径')
     parser.add_argument('--spacing', '-s', type=float, default=0.8,
                         help='点之间的间距，支持浮点数（默认为0.8）')
-
     args = parser.parse_args()
+    DEFAULT_POINT_SPACING = args.spacing
 
-    if not os.path.isdir(args.input):
-        print(f"错误: 输入路径 {args.input} 不是有效的文件夹")
-        return
+    # 创建输出文件夹
+    if not os.path.exists(args.output):
+        os.makedirs(args.output)
+        print(f"Output folder does not exist. Created output folder: {args.output}")
 
-    process_folder(args.input, args.output, args.spacing)
+    process_folder(args.input, args.output, DEFAULT_POINT_SPACING)
 
 
 if __name__ == '__main__':

@@ -12,7 +12,17 @@ import numpy as np
 from PIL import Image, ImageDraw
 import math
 from shapely.geometry import Polygon
+import re
 
+
+def remove_digits(text):
+    """去除字符串中的数字"""
+    return re.sub(r'\d', '', text)
+import re
+
+def remove_digits(text:str)-> str:
+    """使用正则表达式去除数字"""
+    return re.sub(r'\d', '', text)
 
 def create_gaussian_kernel(size, sigma=None):
     """
@@ -99,6 +109,8 @@ def apply_gaussian_at_point(mask, x, y, kernel, label_value):
 def generate_mask_from_json(json_path, output_path, kernel_scale=1.0, default_spacing=1):
     """
     从json文件生成高斯掩码图
+    
+    这个函数现在可以被其他脚本导入和调用，无需global变量
 
     Args:
         json_path: 输入json文件路径
@@ -217,7 +229,7 @@ def generate_mask_from_json(json_path, output_path, kernel_scale=1.0, default_sp
     return True
 
 
-def process_folder(input_folder, output_folder, kernel_scale=1.0, default_spacing=1):
+def process_folder(input_folder, output_folder, BASE_OBJ, SEEN_AFF, NOVEL_AFF, UNSEEN_AFF, kernel_scale=1.0, default_spacing=1):
     """
     批量处理文件夹中的所有json文件（包括子文件夹）
 
@@ -253,8 +265,17 @@ def process_folder(input_folder, output_folder, kernel_scale=1.0, default_spacin
         # 生成同名的png文件，保持目录结构
         output_filename = os.path.splitext(rel_path)[0] + '.png'
         output_path = os.path.join(output_folder, output_filename)
-
-        print(f"处理: {rel_path} -> {output_filename}")
+        obj = remove_digits(output_path.split('/')[-1].split('.')[0])  # lamp
+        
+        # 安全地查找对象在BASE_OBJ中的索引
+        try:
+            aff_index = BASE_OBJ.index(obj)
+            aff = SEEN_AFF[aff_index]
+            output_path = os.path.join(output_folder, aff, obj, output_filename)
+        except ValueError:
+            # 如果对象不在BASE_OBJ列表中，直接保存到输出文件夹
+            print(f"  警告: '{obj}' 不在BASE_OBJ列表中，直接保存到输出目录")
+            output_path = os.path.join(output_folder, output_filename)
 
         try:
             if generate_mask_from_json(input_path, output_path, kernel_scale, default_spacing):
@@ -262,29 +283,33 @@ def process_folder(input_folder, output_folder, kernel_scale=1.0, default_spacin
             else:
                 fail_count += 1
         except Exception as e:
-            print(f"  错误: {e}")
+            print(f"  error: {e}")
             fail_count += 1
 
-    print(f"\n处理完成: 成功 {success_count} 个, 失败 {fail_count} 个")
-    print(f"输出目录: {output_folder}")
+    print(f"\nFinished. Success {success_count}, Fail {fail_count}")
+    print(f"Saved under: {output_folder}")
 
 
 def main():
     parser = argparse.ArgumentParser(description='根据点阵json生成高斯掩码图')
-    parser.add_argument('--input', '-i', required=True, help='输入文件夹路径（包含json文件）')
-    parser.add_argument('--output', '-o', required=True, help='输出文件夹路径（保存png文件）')
-    parser.add_argument('--kernel-scale', '-k', type=float, default=1.0,
+    # parser.add_argument('--input', '-i', default='./data/temps/Spotted', help='输入文件夹路径（包含json文件）')
+    parser.add_argument('--input', '-i', default='/root/autodl-tmp/OOAL/data/source/backrest', help='输入文件夹路径（包含json文件）')
+    parser.add_argument('--output', '-o', default='./data/temps/GT', help='输出文件夹路径（保存png文件）')
+    parser.add_argument('--kernel-scale', '-k', type=float, default=50,
                         help='高斯核缩放因子k，核大小=k*点间距（默认为1.0）')
-    parser.add_argument('--default-spacing', '-s', type=int, default=1,
-                        help='默认点间距，当json中没有记录时使用（默认为1）')
-
+    parser.add_argument('--spacing', '-s', type=float, default=0.8,help='点之间的间距，支持浮点数（默认为0.8）')
     args = parser.parse_args()
 
-    if not os.path.isdir(args.input):
-        print(f"错误: 输入路径 {args.input} 不是有效的文件夹")
-        return
+    import sys
+    sys.path.append('/root/autodl-tmp/OOAL')
+    from data.agd20k_ego import BASE_OBJ, SEEN_AFF, NOVEL_AFF, UNSEEN_AFF
 
-    process_folder(args.input, args.output, args.kernel_scale, args.default_spacing)
+    # 创建输出文件夹
+    if not os.path.exists(args.output):
+        os.makedirs(args.output)
+        print(f"Output folder does not exist. Created output folder: {args.output}")
+
+    process_folder(args.input, args.output, BASE_OBJ, SEEN_AFF, NOVEL_AFF, UNSEEN_AFF, args.kernel_scale, args.spacing)
 
 
 if __name__ == '__main__':
