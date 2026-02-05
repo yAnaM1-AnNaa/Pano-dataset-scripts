@@ -23,29 +23,16 @@ def scale_polygon(points:list, scale_factor:float):
     scaled_pts = center + scale_factor * (pts - center)
     return scaled_pts.tolist()
     
-def shrink_polygon_by_scale(points, scale_factor):
+def shrink_polygon(points, distance):
     poly = Polygon(points)
     if not poly.is_valid:
         return points # 或者尝试 poly.buffer(0) 修复
-
-    # 目标面积 (如果是线性缩放比例 scale=0.8，面积就是 0.64)
-    # 如果你的 scale 参数是指边长比例（通常是这样），则 target_area = area * scale^2
-    target_area = poly.area * (scale_factor ** 2)
-    
-    # 面积差
-    area_diff = poly.area - target_area
-    
-    # 估算 distance: 面积差 / 周长
-    # 这是一个近似值，对于细长物体可能不准，但比盲猜好
-    if poly.length == 0: return points
-    initial_distance = area_diff / poly.length
     
     # 执行收缩
-    shrunk_poly = poly.buffer(-initial_distance, join_style=2)
+    shrunk_poly = poly.buffer(-distance, join_style=2)
    
-    # 提取坐标
-    # shapely 返回的坐标通常最后一点和第一点重复，需要去掉最后一点
-    x, y = shrunk_poly.exterior.coords.xy
+    # shapely 返回的坐标通常最后一点和第一点重复，但是json不需要重复的点，所以需要去掉最后一点
+    x, y = shrunk_poly.exterior.xy
     new_points = list(zip(x, y))[:-1]
     
     return new_points
@@ -60,7 +47,7 @@ def process_json_file(input_path, output_path, scale_factor):
         
         for i in range(len(data['shapes'])):
             points = data['shapes'][i]['points']
-            data['shapes'][i]['points'] = scale_polygon(points, scale_factor)
+            data['shapes'][i]['points'] = shrink_polygon(points, scale_factor)
 
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False) 
@@ -100,7 +87,7 @@ def main():
     parser = argparse.ArgumentParser(description='递归缩小文件夹中所有JSON文件的多边形')
     parser.add_argument('--input', '-i', default='./data/source', help='输入文件夹路径，递归处理所有子文件夹中的JSON文件')
     parser.add_argument('--output', '-o', default='./data/temps', help='输出文件夹路径，保持原有目录结构')
-    parser.add_argument('--scale', '-s', type=float, default=0.4, help='缩放比例')
+    parser.add_argument('--distance', '-d', type=float, default=0.4, help='缩放距离')
     args = parser.parse_args()
 
     # 创建输出文件夹
@@ -109,15 +96,14 @@ def main():
         print(f"Output folder does not exist. Created output folder: {args.output}")
     
     print(f"Start processing  {args.input}")
-    print(f"Scale factor: {args.scale}")
+    print(f"Shrink distance: {args.distance}")
     print(f"Output to: {args.output}")
     
     # 递归处理所有JSON文件
-    success_count, error_count = process_directory_recursive(args.input, args.output, args.scale)
+    success_count, error_count = process_directory_recursive(args.input, args.output, args.distance)
     
     print("-" * 50)
     print(f"Succededd {success_count}, Failed {error_count}")
-    print(f"All shrinked json files saved under {args.output}")
 
 if __name__ == '__main__':
     main()

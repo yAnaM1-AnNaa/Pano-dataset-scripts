@@ -26,12 +26,14 @@
 
 INPUT_DIR=${1:-"/root/autodl-tmp/OOAL/data/source"}
 OUTPUT_DIR=${2:-"/root/autodl-tmp/OOAL/data/temps/3"}
-SPACING=${3:-1}
-KERNEL_SCALE=${4:-50}
+SHRINK_DISTANCE=${3:- 50}
+SPACING=${4:- 1}
+KERNEL_SCALE=${5:- 50}
 
 SCRIPT_DIR="/root/autodl-tmp/OOAL/utils/data_process"
+
 echo "Start Shrinking polygons."
-python $SCRIPT_DIR/suoxiao.py --input "$INPUT_DIR" --output "${OUTPUT_DIR}/Shrinked" --scale 0.6 
+python $SCRIPT_DIR/shrink_polygon.py --input "$INPUT_DIR" --output "${OUTPUT_DIR}/Shrinked" --distance $SHRINK_DISTANCE 
 
 echo "Start Converting polygons to dense points."
 python $SCRIPT_DIR/convert_polygon_to_points.py --input "${OUTPUT_DIR}/Shrinked" --output "${OUTPUT_DIR}/Spotted" --spacing $SPACING
