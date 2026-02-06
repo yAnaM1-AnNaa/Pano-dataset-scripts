@@ -25,21 +25,20 @@
 # ==============================================================================
 
 INPUT_DIR=${1:-"/root/autodl-tmp/OOAL/data/source"}
-OUTPUT_DIR=${2:-"/root/autodl-tmp/OOAL/data/temps/3"}
+OUTPUT_DIR=${2:-"/root/autodl-tmp/OOAL/data/temps/7"}
 SHRINK_DISTANCE=${3:- 50}
-SPACING=${4:- 1}
-KERNEL_SCALE=${5:- 50}
+SPACING=${4:- 2}
 
-SCRIPT_DIR="/root/autodl-tmp/OOAL/utils/data_process"
+SCRIPT_DIR="/root/autodl-tmp/OOAL/utils"
 
 echo "Start Shrinking polygons."
-python $SCRIPT_DIR/shrink_polygon.py --input "$INPUT_DIR" --output "${OUTPUT_DIR}/Shrinked" --distance $SHRINK_DISTANCE 
+python $SCRIPT_DIR/shrink_polygon.py --input "$INPUT_DIR" --output "${OUTPUT_DIR}/Shrinked" --distance $SHRINK_DISTANCE --config "${OUTPUT_DIR}/Shrink_config.json"
 
 echo "Start Converting polygons to dense points."
 python $SCRIPT_DIR/convert_polygon_to_points.py --input "${OUTPUT_DIR}/Shrinked" --output "${OUTPUT_DIR}/Spotted" --spacing $SPACING
 
 echo "Start Generating Gaussian masks."
-python $SCRIPT_DIR/generate_gaussian_mask.py --input "${OUTPUT_DIR}/Spotted" --output "${OUTPUT_DIR}/GT" --kernel-scale $KERNEL_SCALE --spacing $SPACING
+python $SCRIPT_DIR/generate_gaussian_mask.py --input "${OUTPUT_DIR}/Spotted" --output "${OUTPUT_DIR}/GT" --config "${OUTPUT_DIR}/Shrink_config.json"
 
-
-
+echo "Start Visualizing."
+python $SCRIPT_DIR/visualize_mask.py --image "$INPUT_DIR" --mask "${OUTPUT_DIR}/GT" --output "${OUTPUT_DIR}/Vis"

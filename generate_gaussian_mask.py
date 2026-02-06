@@ -15,11 +15,6 @@ from shapely.geometry import Polygon
 import re
 
 
-def remove_digits(text):
-    """去除字符串中的数字"""
-    return re.sub(r'\d', '', text)
-import re
-
 def remove_digits(text:str)-> str:
     """使用正则表达式去除数字"""
     return re.sub(r'\d', '', text)
@@ -27,11 +22,9 @@ def remove_digits(text:str)-> str:
 def create_gaussian_kernel(size, sigma=None):
     """
     创建高斯核
-
     Args:
         size: 核大小（会自动转换为奇数）
         sigma: 高斯标准差（如果为None，则根据size自动计算）
-
     Returns:
         归一化的高斯核
     """
@@ -63,7 +56,7 @@ def create_gaussian_kernel(size, sigma=None):
     return kernel
 
 
-def apply_gaussian_at_point(mask, x, y, kernel, label_value):
+def apply_gaussian_at_point(mask, x, y, kernel):
     """
     在指定位置应用高斯核
 
@@ -102,122 +95,64 @@ def apply_gaussian_at_point(mask, x, y, kernel, label_value):
 
     # 将高斯值乘以标签值，并与现有值取最大（避免覆盖）
     mask_region = mask[img_y_start:img_y_end, img_x_start:img_x_end]
-    new_values = kernel_part * label_value
+    new_values = kernel_part
     mask[img_y_start:img_y_end, img_x_start:img_x_end] = np.maximum(mask_region, new_values)
 
 
-def generate_mask_from_json(json_path, output_path, kernel_scale=1.0, default_spacing=1):
+def generate_mask_from_json(json_path, output_path, distance_config:dict):
     """
-    从json文件生成高斯掩码图
-    
-    这个函数现在可以被其他脚本导入和调用，无需global变量
-
+    从单个json文件生成高斯掩码图
     Args:
         json_path: 输入json文件路径
         output_path: 输出png文件路径
-        kernel_scale: 高斯核缩放因子 k（kernel_size = k * spacing）
-        default_spacing: 默认点间距（如果json中没有记录）
-
-    Returns:
-        是否成功
+        distance_config: 缩放距离配置字典
     """
-    # 读取json文件
     with open(json_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
-    # 获取图像尺寸
     image_width = data.get('imageWidth')
     image_height = data.get('imageHeight')
 
     if image_width is None or image_height is None:
-        print(f"警告: {json_path} 缺少图像尺寸信息，跳过处理")
+        print(f"  {json_path} 缺少图像尺寸信息，跳过处理")
         return False
-
-    # 获取点间距（从第一个功能保存的信息）
-    point_spacing = data.get('point_spacing', default_spacing)
-
-    # 计算高斯核大小
-    kernel_size = max(1, int(kernel_scale * point_spacing))
-    kernel = create_gaussian_kernel(kernel_size)
-
-    print(f"  点间距: {point_spacing}, 核缩放: {kernel_scale}, 核大小: {kernel.shape[0]}")
 
     # 创建掩码数组（使用float以保存高斯渐变值）
     mask = np.zeros((image_height, image_width), dtype=np.float32)
 
-    # 获取所有shapes的标签，为每个标签分配一个值
+    # 获取所有shapes
     shapes = data.get('shapes', [])
-    label_set = set()
-    for shape in shapes:
-        label_set.add(shape.get('label', 'unknown'))
-
-    # 为每个标签分配一个值（1, 2, 3, ...），0保留给背景
-    label_to_value = {label: idx + 1 for idx, label in enumerate(sorted(label_set))}
-
-    if label_to_value:
-        print(f"  标签映射: {label_to_value}")
-
-    # 从json中读取原始多边形（如果有）
-    original_polygons = data.get('original_polygons', [])
-    if original_polygons:
-        print(f"  找到 {len(original_polygons)} 个原始多边形用于裁剪")
-
-    # 处理每个shape
-    for shape in shapes:
+    for idx, shape in enumerate(shapes):
         shape_type = shape.get('shape_type', '')
         label = shape.get('label', 'unknown')
         points = shape.get('points', [])
-        label_value = label_to_value.get(label, 1)
 
-        # 处理点阵类型（由第一个脚本生成）
         if shape_type == 'points':
-            print(f"  处理点阵 '{label}': {len(points)} 个点, 值={label_value}")
+            # Shrink_config:{'armset1.json':distance,...}
+            # mask_json_path: /root/autodl-tmp/OOAL/data/temps/7/Spotted/armset1.json
+            print(f"Generating mask '{label}': {len(points)} dots")
+            # 根据缩小的distance确定高斯核大小
+            json_name = os.path.basename(json_path)
+            shrink_dist = int(distance_config[json_name][idx])
+            kernel_size = max(3, int(shrink_dist * 10))  # 核大小=收缩距离*s
+            kernel = create_gaussian_kernel(kernel_size)
             for point in points:
                 x, y = point[0], point[1]
-                apply_gaussian_at_point(mask, x, y, kernel, label_value)
-
-        # 也支持直接处理多边形（如果json未经第一个脚本处理）
-        elif shape_type == 'polygon' and len(points) >= 3:
-            print(f"  警告: 发现未转换的多边形 '{label}'，建议先用convert_polygon_to_points.py处理")
-            # 简单地在多边形顶点位置应用高斯
-            for point in points:
-                x, y = point[0], point[1]
-                apply_gaussian_at_point(mask, x, y, kernel, label_value)
-
-        # 支持单点类型
+                apply_gaussian_at_point(mask, x, y, kernel)
         elif shape_type == 'point' and len(points) >= 1:
+            print(f"Processing '{label}': {len(points)} dots")
+            shrink_dist = int(distance_config[json_name][idx])
+            kernel_size = max(3, int(shrink_dist * 20))
+            kernel = create_gaussian_kernel(kernel_size)
             for point in points:
                 x, y = point[0], point[1]
-                apply_gaussian_at_point(mask, x, y, kernel, label_value)
+                apply_gaussian_at_point(mask, x, y, kernel)
 
     # 归一化到0-255范围
     if mask.max() > 0:
-        # 保持多值特性：不同标签值会有不同的最大灰度
-        # 将最大值映射到255
-        max_label_value = max(label_to_value.values()) if label_to_value else 1
-        mask = (mask / max_label_value) * 255
+        mask = (mask / mask.max()) * 255
         mask = np.clip(mask, 0, 255)
-
-    # 转换为uint8
     mask_uint8 = mask.astype(np.uint8)
-
-    # 使用原始多边形裁剪掩码（避免超出边界）
-    if original_polygons:
-        print(f"  应用多边形裁剪")
-        # 创建多边形掩码
-        polygon_mask = Image.new('L', (image_width, image_height), 0)
-        draw = ImageDraw.Draw(polygon_mask)
-        
-        for poly_points in original_polygons:
-            # 将点转换为PIL需要的格式
-            flat_points = [(int(p[0]), int(p[1])) for p in poly_points]
-            draw.polygon(flat_points, fill=255)
-        
-        # 将多边形掩码转换为numpy数组
-        polygon_mask_np = np.array(polygon_mask)
-        
-        # 裁剪：多边形外的区域设为0
-        mask_uint8 = np.where(polygon_mask_np > 0, mask_uint8, 0).astype(np.uint8)
 
     # 确保输出目录存在
     os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else '.', exist_ok=True)
@@ -229,7 +164,7 @@ def generate_mask_from_json(json_path, output_path, kernel_scale=1.0, default_sp
     return True
 
 
-def process_folder(input_folder, output_folder, BASE_OBJ, SEEN_AFF, NOVEL_AFF, UNSEEN_AFF, kernel_scale=1.0, default_spacing=1):
+def process_folder(input_folder, output_folder, BASE_OBJ, SEEN_AFF, NOVEL_AFF, UNSEEN_AFF, distance_config):
     """
     批量处理文件夹中的所有json文件（包括子文件夹）
 
@@ -238,6 +173,7 @@ def process_folder(input_folder, output_folder, BASE_OBJ, SEEN_AFF, NOVEL_AFF, U
         output_folder: 输出文件夹路径
         kernel_scale: 高斯核缩放因子
         default_spacing: 默认点间距
+        distance_config: 距离配置字典
     """
     # 确保输出文件夹存在
     os.makedirs(output_folder, exist_ok=True)
@@ -267,7 +203,6 @@ def process_folder(input_folder, output_folder, BASE_OBJ, SEEN_AFF, NOVEL_AFF, U
         output_path = os.path.join(output_folder, output_filename)
         obj = remove_digits(output_path.split('/')[-1].split('.')[0])  # lamp
         
-        # 安全地查找对象在BASE_OBJ中的索引
         try:
             aff_index = BASE_OBJ.index(obj)
             aff = SEEN_AFF[aff_index]
@@ -278,12 +213,15 @@ def process_folder(input_folder, output_folder, BASE_OBJ, SEEN_AFF, NOVEL_AFF, U
             output_path = os.path.join(output_folder, output_filename)
 
         try:
-            if generate_mask_from_json(input_path, output_path, kernel_scale, default_spacing):
+            if generate_mask_from_json(input_path, output_path, distance_config):
                 success_count += 1
             else:
                 fail_count += 1
         except Exception as e:
-            print(f"  error: {e}")
+            print(f"  ✗ 处理文件出错: '{output_path}'")
+            print(f"    错误详情: {type(e).__name__}: {e}")
+            import traceback
+            print(f"    位置: {traceback.format_exc().splitlines()[-2].strip()}")
             fail_count += 1
 
     print(f"\nFinished. Success {success_count}, Fail {fail_count}")
@@ -292,12 +230,9 @@ def process_folder(input_folder, output_folder, BASE_OBJ, SEEN_AFF, NOVEL_AFF, U
 
 def main():
     parser = argparse.ArgumentParser(description='根据点阵json生成高斯掩码图')
-    # parser.add_argument('--input', '-i', default='./data/temps/Spotted', help='输入文件夹路径（包含json文件）')
     parser.add_argument('--input', '-i', default='/root/autodl-tmp/OOAL/data/source/backrest', help='输入文件夹路径（包含json文件）')
     parser.add_argument('--output', '-o', default='./data/temps/GT', help='输出文件夹路径（保存png文件）')
-    parser.add_argument('--kernel-scale', '-k', type=float, default=50,
-                        help='高斯核缩放因子k，核大小=k*点间距（默认为1.0）')
-    parser.add_argument('--spacing', '-s', type=float, default=0.8,help='点之间的间距，支持浮点数（默认为0.8）')
+    parser.add_argument('--config', '-c', default='./data/temps/GT/distance_config.json', help='保存每个文件缩放距离的配置文件路径')
     args = parser.parse_args()
 
     import sys
@@ -309,7 +244,10 @@ def main():
         os.makedirs(args.output)
         print(f"Output folder does not exist. Created output folder: {args.output}")
 
-    process_folder(args.input, args.output, BASE_OBJ, SEEN_AFF, NOVEL_AFF, UNSEEN_AFF, args.kernel_scale, args.spacing)
+    with open(args.config, 'r', encoding='utf-8') as f:
+        distance_config = json.load(f)
+
+    process_folder(args.input, args.output, BASE_OBJ, SEEN_AFF, NOVEL_AFF, UNSEEN_AFF, distance_config)
 
 
 if __name__ == '__main__':

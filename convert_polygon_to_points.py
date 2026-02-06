@@ -83,8 +83,9 @@ def process_json_file(input_path, output_path, point_spacing=1):
 
     # 处理每个shape
     new_shapes = []
-    for shape in data.get('shapes', []):
+    for idx, shape in enumerate(data.get('shapes', [])):
         shape_type = shape.get('shape_type', '')
+        label = shape.get('label', '')
 
         if shape_type == 'polygon':
             # 将多边形转换为点阵
@@ -99,7 +100,7 @@ def process_json_file(input_path, output_path, point_spacing=1):
 
                 # 创建新的shape，类型改为point（多个点）
                 new_shape = {
-                    'label': shape.get('label', ''),
+                    'label': label,
                     'points': dense_points,
                     'group_id': shape.get('group_id'),
                     'shape_type': 'points',  # 自定义类型，表示点阵
@@ -110,12 +111,15 @@ def process_json_file(input_path, output_path, point_spacing=1):
                     'original_shape_type': 'polygon'
                 }
                 new_shapes.append(new_shape)
-                print(f"  Converted polygon '{shape.get('label')}': {len(polygon_points)} vertices -> {len(dense_points)} points")
+                print(f"  [Shape {idx}] Converted polygon '{label}': {len(polygon_points)} vertices -> {len(dense_points)} points")
             else:
                 # 多边形顶点不足，保持原样
+                print(f"  [Shape {idx}] 警告: 多边形 '{label}' 顶点数 {len(polygon_points)} < 3，保持原样")
                 new_shapes.append(shape)
         else:
             # 非多边形类型，保持原样
+            if shape_type:
+                print(f"  [Shape {idx}] 跳过非多边形类型 '{shape_type}' ('{label}')")
             new_shapes.append(shape)
 
     # 更新shapes
