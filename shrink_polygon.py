@@ -95,7 +95,7 @@ def process_json_file(input_path, output_path, initial_distance, distance_dict):
                 else:
                     print(f"  Shape {i}: 修复失败，保持原始坐标")
             
-            # 更智能的收缩：基于面积比而非点数
+            # 收缩：基于面积比
             original_area = Polygon(points).area
             current_distance = initial_distance
             
@@ -105,7 +105,7 @@ def process_json_file(input_path, output_path, initial_distance, distance_dict):
                     current_distance *= 0.95
                     continue
                 shrunk_area = Polygon(new_points).area if shrunk_len > 2 else 0
-                if shrunk_area >= original_area * 0.7:  # 保留70%以上面积
+                if shrunk_area >= original_area * 0.5:  # 达到原始面积的一定比例后停止
                     break
                 current_distance *= 0.95
             

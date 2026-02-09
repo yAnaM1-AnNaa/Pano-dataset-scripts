@@ -12,6 +12,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 import math
 from shapely.geometry import Polygon
+from scipy.ndimage import gaussian_filter
 import re
 
 
@@ -37,7 +38,8 @@ def create_gaussian_kernel(size, sigma=None):
 
     if sigma is None:
         # 常用公式：sigma = (size - 1) / 6，这样3sigma覆盖核的范围
-        sigma = (size - 1) / 6.0
+        # 可以修改sigma的大小来调整最终的深色区域大小，sigma越大深色区域越大。
+        sigma = (size - 1) / 22
         if sigma <= 0:
             sigma = 0.5
 
@@ -51,7 +53,8 @@ def create_gaussian_kernel(size, sigma=None):
     kernel = np.exp(-(xx**2 + yy**2) / (2 * sigma**2))
 
     # 归一化使峰值为1
-    kernel = kernel / kernel.max()
+    # kernel = kernel / kernel.max()
+    kernel = np.power(kernel, 0.3)
 
     return kernel
 
@@ -95,8 +98,8 @@ def apply_gaussian_at_point(mask, x, y, kernel):
 
     # 将高斯值乘以标签值，并与现有值取最大（避免覆盖）
     mask_region = mask[img_y_start:img_y_end, img_x_start:img_x_end]
-    new_values = kernel_part
-    mask[img_y_start:img_y_end, img_x_start:img_x_end] = np.maximum(mask_region, new_values)
+    combined = mask_region + kernel_part
+    mask[img_y_start:img_y_end, img_x_start:img_x_end] = np.minimum(combined, 1.0)
 
 
 def generate_mask_from_json(json_path, output_path, distance_config:dict):
@@ -122,31 +125,41 @@ def generate_mask_from_json(json_path, output_path, distance_config:dict):
 
     # 获取所有shapes
     shapes = data.get('shapes', [])
+    json_name = os.path.basename(json_path)
+    
     for idx, shape in enumerate(shapes):
         shape_type = shape.get('shape_type', '')
         label = shape.get('label', 'unknown')
         points = shape.get('points', [])
 
-        if shape_type == 'points':
+        if shape_type in ['points', 'point'] and len(points) >= 1:
             # Shrink_config:{'armset1.json':distance,...}
             # mask_json_path: /root/autodl-tmp/OOAL/data/temps/7/Spotted/armset1.json
             print(f"Generating mask '{label}': {len(points)} dots")
-            # 根据缩小的distance确定高斯核大小
+            # 根据 shrink_dist 动态调整gaussian blur的sigma和kernel size
             json_name = os.path.basename(json_path)
-            shrink_dist = int(distance_config[json_name][idx])
-            kernel_size = max(3, int(shrink_dist * 10))  # 核大小=收缩距离*s
-            kernel = create_gaussian_kernel(kernel_size)
+            shrink_dist = float(distance_config[json_name][idx])
+            sigma = max(0.5, shrink_dist * 0.7)  # sigma越大，高斯分布越平缓。
+            # if shrink_dist < 15:
+            #     kernel_size = max(10, shrink_dist * 5)
+            # else:
+            #     kernel_size = max(10, shrink_dist * 3)
+            print(f"Generating '{label}': {len(points)} dots, dist={shrink_dist:.1f}, sigma={sigma:.2f}")
+            
+            # 创建点阵图（在点的位置设为 1.0）
+            shape_mask = np.zeros((image_height, image_width), dtype=np.float32)
             for point in points:
-                x, y = point[0], point[1]
-                apply_gaussian_at_point(mask, x, y, kernel)
-        elif shape_type == 'point' and len(points) >= 1:
-            print(f"Processing '{label}': {len(points)} dots")
-            shrink_dist = int(distance_config[json_name][idx])
-            kernel_size = max(3, int(shrink_dist * 20))
-            kernel = create_gaussian_kernel(kernel_size)
-            for point in points:
-                x, y = point[0], point[1]
-                apply_gaussian_at_point(mask, x, y, kernel)
+                px, py = int(round(point[0])), int(round(point[1])) # 图像数组只能用整数索引访问像素位置
+                if 0 <= px < image_width and 0 <= py < image_height:
+                    shape_mask[py, px] = 1.0
+            
+            # 使用 scipy.gaussian_filter 进行高斯滤波
+            # radius 参数如果不指定，scipy会根据 truncate=4.0 自动计算（约 4*sigma）
+            blurred = gaussian_filter(shape_mask, sigma=sigma, mode='constant')
+            blurred = np.clip(blurred, 0.0, 1.0)
+            
+            # 融入主掩码（使用 maximum 避免不同形状互相覆盖）
+            mask = np.maximum(mask, blurred)
 
     # 归一化到0-255范围
     if mask.max() > 0:

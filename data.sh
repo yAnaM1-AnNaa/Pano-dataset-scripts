@@ -25,7 +25,7 @@
 # ==============================================================================
 
 INPUT_DIR=${1:-"/root/autodl-tmp/OOAL/data/source"}
-OUTPUT_DIR=${2:-"/root/autodl-tmp/OOAL/data/temps/7"}
+OUTPUT_DIR=${2:-"/root/autodl-tmp/OOAL/data/temps/12"}
 SHRINK_DISTANCE=${3:- 50}
 SPACING=${4:- 2}
 
