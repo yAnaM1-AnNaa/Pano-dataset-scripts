@@ -177,7 +177,7 @@ def generate_mask_from_json(json_path, output_path, distance_config:dict):
     return True
 
 
-def process_folder(input_folder, output_folder, BASE_OBJ, SEEN_AFF, NOVEL_AFF, UNSEEN_AFF, distance_config):
+def process_folder(input_folder, output_folder, BASE_OBJ, SEEN_AFF, NOVEL_OBJ, UNSEEN_AFF, distance_config):
     """
     批量处理文件夹中的所有json文件（包括子文件夹）
 
@@ -241,6 +241,46 @@ def process_folder(input_folder, output_folder, BASE_OBJ, SEEN_AFF, NOVEL_AFF, U
     print(f"Saved under: {output_folder}")
 
 
+def process_folder_simple(input_folder, output_folder, distance_config):
+    """
+    Process JSON files and write PNG masks, preserving relative paths.
+    This variant avoids dataset-specific label routing.
+    """
+    os.makedirs(output_folder, exist_ok=True)
+
+    json_files = []
+    for root, _, files in os.walk(input_folder):
+        for file in files:
+            if file.endswith('.json'):
+                full_path = os.path.join(root, file)
+                rel_path = os.path.relpath(full_path, input_folder)
+                json_files.append((full_path, rel_path))
+
+    if not json_files:
+        print(f"No json files found under {input_folder}")
+        return
+
+    print(f"Processing {len(json_files)} json files")
+    success_count = 0
+    fail_count = 0
+
+    for input_path, rel_path in sorted(json_files):
+        output_filename = os.path.splitext(rel_path)[0] + '.png'
+        output_path = os.path.join(output_folder, output_filename)
+        try:
+            if generate_mask_from_json(input_path, output_path, distance_config):
+                success_count += 1
+            else:
+                fail_count += 1
+        except Exception as e:
+            print(f"  Error generating mask: {input_path}")
+            print(f"    {type(e).__name__}: {e}")
+            fail_count += 1
+
+    print(f"\nFinished. Success {success_count}, Fail {fail_count}")
+    print(f"Saved under: {output_folder}")
+
+
 def main():
     parser = argparse.ArgumentParser(description='根据点阵json生成高斯掩码图')
     parser.add_argument('--input', '-i', default='/root/autodl-tmp/OOAL/data/source/backrest', help='输入文件夹路径（包含json文件）')
@@ -250,7 +290,7 @@ def main():
 
     import sys
     sys.path.append('/root/autodl-tmp/OOAL')
-    from data.agd20k_ego import BASE_OBJ, SEEN_AFF, NOVEL_AFF, UNSEEN_AFF
+    from data import BASE_OBJ, SEEN_AFF, NOVEL_OBJ, UNSEEN_AFF
 
     # 创建输出文件夹
     if not os.path.exists(args.output):
@@ -260,7 +300,7 @@ def main():
     with open(args.config, 'r', encoding='utf-8') as f:
         distance_config = json.load(f)
 
-    process_folder(args.input, args.output, BASE_OBJ, SEEN_AFF, NOVEL_AFF, UNSEEN_AFF, distance_config)
+    process_folder(args.input, args.output, BASE_OBJ, SEEN_AFF, NOVEL_OBJ, UNSEEN_AFF, distance_config)
 
 
 if __name__ == '__main__':

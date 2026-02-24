@@ -41,4 +41,4 @@ echo "Start Generating Gaussian masks."
 python $SCRIPT_DIR/generate_gaussian_mask.py --input "${OUTPUT_DIR}/Spotted" --output "${OUTPUT_DIR}/GT" --config "${OUTPUT_DIR}/Shrink_config.json"
 
 echo "Start Visualizing."
-python $SCRIPT_DIR/visualize_mask.py --image "$INPUT_DIR" --mask "${OUTPUT_DIR}/GT" --output "${OUTPUT_DIR}/Vis"
+python $SCRIPT_DIR/visualize_mask.py --image "$INPUT_DIR" --mask "${OUTPUT_DIR}/GT" --output "${OUTPUT_DIR}/Vis"ying
