@@ -1,5 +1,5 @@
 # Repository Guidelines
-
+Always ask before doing any changes in code.
 ## Project Structure & Module Organization
 - Pipeline entry: `pipeline.py` runs json-shrink -> json-convert -> json-png -> mask-viz.
 - Core processing scripts live in `util/` (`shrink_polygon.py`, `convert_polygon_to_points.py`, `generate_gaussian_mask.py`, `visualize_mask.py`).

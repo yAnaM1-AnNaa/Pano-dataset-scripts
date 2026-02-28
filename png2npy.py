@@ -1,5 +1,6 @@
 import argparse
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -7,6 +8,13 @@ import cv2
 import numpy as np
 
 from util.data import BASE_OBJ, SEEN_AFF
+
+
+def normalize_object_name(stem: str) -> str:
+    # bathtub83 -> bathtub, chair_001 -> chair
+    obj = re.sub(r"\d+", "", stem)
+    obj = obj.rstrip("_- ")
+    return obj
 
 
 def parse_args():
@@ -78,7 +86,7 @@ def main():
     affordance_list = SEEN_AFF
     affordance_by_obj = dict(zip(BASE_OBJ, SEEN_AFF))
 
-    mask_files = sorted([f for f in png_folder.iterdir() if f.suffix.lower() == ".png"])
+    mask_files = sorted([f for f in png_folder.rglob("*.png") if f.is_file()])
     if not mask_files:
         print(f"No PNG files found in {png_folder}")
         return
@@ -88,8 +96,10 @@ def main():
 
         write_black_pngs(temp_folder, len(affordance_list), mask_size)
 
+        rel_path = mask_path.relative_to(png_folder)
         stem = mask_path.stem
-        aff = affordance_by_obj.get(stem)
+        obj_name = normalize_object_name(stem)
+        aff = affordance_by_obj.get(obj_name)
         temp_mask_path = temp_folder / mask_path.name
         shutil.copy2(mask_path, temp_mask_path)
 
@@ -101,7 +111,10 @@ def main():
             shutil.move(str(temp_mask_path), str(target_black))
             print(f"Replaced {mask_path.name} -> {idx}.png (affordance: {aff})")
         else:
-            print(f"No affordance mapping for {mask_path.name}; skipping.")
+            print(
+                f"No affordance mapping for {mask_path.name} "
+                f"(normalized object: {obj_name}); skipping."
+            )
             if temp_mask_path.exists():
                 temp_mask_path.unlink()
             continue
@@ -116,7 +129,9 @@ def main():
                 mask = load_png_as_mask(mask_file, target_shape=mask_size)
             masks.append(mask)
         affordance_masks = np.stack(masks, axis=0).astype(np.float32)
-        npy_save_path = output_npy_dir / f"{stem}.npy"
+        npy_rel_path = rel_path.with_name(f"{obj_name}.npy")
+        npy_save_path = output_npy_dir / npy_rel_path
+        npy_save_path.parent.mkdir(parents=True, exist_ok=True)
         np.save(npy_save_path, affordance_masks)
         print(
             f"Saved {npy_save_path} shape={affordance_masks.shape} "
