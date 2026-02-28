@@ -35,7 +35,14 @@ def shrink_polygon(points, distance, auto_fix=True):
     return new_points, shrunk_len
 
 
-def process_json_file(input_path, output_path, initial_distance, distance_dict, config_key=None):
+def process_json_file(
+    input_path,
+    output_path,
+    initial_distance,
+    distance_dict,
+    config_key=None,
+    min_area_ratio=0.5,
+):
     if config_key is None:
         config_key = os.path.basename(input_path)
     config_key = config_key.replace("\\", "/")
@@ -75,7 +82,7 @@ def process_json_file(input_path, output_path, initial_distance, distance_dict, 
                     current_distance *= 0.95
                     continue
                 shrunk_area = Polygon(new_points).area if shrunk_len > 2 else 0
-                if shrunk_area >= original_area * 0.5:
+                if shrunk_area >= original_area * min_area_ratio:
                     break
                 current_distance *= 0.95
 
@@ -91,7 +98,7 @@ def process_json_file(input_path, output_path, initial_distance, distance_dict, 
         return False
 
 
-def process_directory_recursive(input_dir, output_dir, distance, config_path):
+def process_directory_recursive(input_dir, output_dir, distance, config_path, min_area_ratio=0.5):
     success_count = 0
     error_count = 0
     all_distance_configs = {}
@@ -111,6 +118,7 @@ def process_directory_recursive(input_dir, output_dir, distance, config_path):
                 distance,
                 all_distance_configs,
                 config_key=rel_path,
+                min_area_ratio=min_area_ratio,
             )
             if ok:
                 print(f"{file} finished")
@@ -140,6 +148,12 @@ def main():
     )
     parser.add_argument("--distance", "-d", type=float, default=50, help="Shrink distance.")
     parser.add_argument(
+        "--min-area-ratio",
+        type=float,
+        default=0.5,
+        help="Minimum kept area ratio after shrinking (0-1).",
+    )
+    parser.add_argument(
         "--config",
         "-c",
         default="/root/autodl-tmp/OOAL/data/temps/6/shrink_config.json",
@@ -154,7 +168,13 @@ def main():
     print(f"Start processing {args.input}")
     print(f"Shrink distance: {args.distance}")
     print(f"Output to: {args.output}")
-    success_count, error_count = process_directory_recursive(args.input, args.output, args.distance, args.config)
+    success_count, error_count = process_directory_recursive(
+        args.input,
+        args.output,
+        args.distance,
+        args.config,
+        min_area_ratio=args.min_area_ratio,
+    )
     print("-" * 50)
     print(f"Succeeded {success_count}, Failed {error_count}")
 

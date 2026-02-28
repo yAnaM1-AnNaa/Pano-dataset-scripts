@@ -22,7 +22,13 @@ def cmd_json_shrink(args: argparse.Namespace) -> int:
     if not args.config:
         args.config = os.path.join(args.output, 'Shrink_config.json')
     ensure_dir(os.path.dirname(args.config) if args.config else '')
-    shrink_mod.process_directory_recursive(args.input, args.output, args.distance, args.config)
+    shrink_mod.process_directory_recursive(
+        args.input,
+        args.output,
+        args.distance,
+        args.config,
+        min_area_ratio=args.min_area_ratio,
+    )
     return 0
 
 
@@ -38,7 +44,13 @@ def cmd_json_png(args: argparse.Namespace) -> int:
         args.config = os.path.join(os.path.dirname(args.output), 'Shrink_config.json')
     with open(args.config, 'r', encoding='utf-8') as f:
         distance_config = json.load(f)
-    mask_mod.process_folder_simple(args.input, args.output, distance_config)
+    mask_mod.process_folder_simple(
+        args.input,
+        args.output,
+        distance_config,
+        sigma_scale=args.sigma_scale,
+        sigma_min=args.sigma_min,
+    )
     return 0
 
 
@@ -78,7 +90,13 @@ def cmd_run(args: argparse.Namespace) -> int:
     ensure_dir(viz_dir)
 
     print('Step 1/4: json-shrink')
-    shrink_mod.process_directory_recursive(input_dir, shrink_dir, args.distance, config_path)
+    shrink_mod.process_directory_recursive(
+        input_dir,
+        shrink_dir,
+        args.distance,
+        config_path,
+        min_area_ratio=args.min_area_ratio,
+    )
 
     print('Step 2/4: json-convert')
     convert_mod.process_folder(shrink_dir, convert_dir, args.spacing)
@@ -86,7 +104,13 @@ def cmd_run(args: argparse.Namespace) -> int:
     print('Step 3/4: json-png')
     with open(config_path, 'r', encoding='utf-8') as f:
         distance_config = json.load(f)
-    mask_mod.process_folder_simple(convert_dir, mask_dir, distance_config)
+    mask_mod.process_folder_simple(
+        convert_dir,
+        mask_dir,
+        distance_config,
+        sigma_scale=args.sigma_scale,
+        sigma_min=args.sigma_min,
+    )
 
     print('Step 4/4: mask-viz')
     if os.path.isdir(input_dir):
@@ -106,6 +130,7 @@ def build_parser() -> argparse.ArgumentParser:
     shrink_p.add_argument('--input', '-i', default=r'E:\GithubRepository\code_77329\dataset\pre', help='Input json directory.')
     shrink_p.add_argument('--output', '-o', default=r'E:\GithubRepository\code_77329\dataset\pre_shrink', help='Output json directory.')
     shrink_p.add_argument('--distance', '-d', type=float, default=50, help='Shrink distance.')
+    shrink_p.add_argument('--min-area-ratio', type=float, default=0.5, help='Minimum kept area ratio after shrinking (0-1).')
     shrink_p.add_argument('--config', '-c', default='', help='Output distance config json path.')
     shrink_p.set_defaults(func=cmd_json_shrink)
 
@@ -119,6 +144,8 @@ def build_parser() -> argparse.ArgumentParser:
     png_p.add_argument('--input', '-i', default=r'E:\GithubRepository\code_77329\dataset\pre_spotted', help='Input json directory.')
     png_p.add_argument('--output', '-o', default=r'E:\GithubRepository\code_77329\dataset\pre_gt', help='Output png directory.')
     png_p.add_argument('--config', '-c', default='', help='Distance config json path.')
+    png_p.add_argument('--sigma-scale', type=float, default=0.7, help='Sigma scale factor for shrink distance.')
+    png_p.add_argument('--sigma-min', type=float, default=0.5, help='Minimum sigma value.')
     png_p.set_defaults(func=cmd_json_png)
 
     viz_p = subparsers.add_parser('mask-viz', help='Visualize mask overlays.')
@@ -132,7 +159,10 @@ def build_parser() -> argparse.ArgumentParser:
     run_p.add_argument('--input', '-i', default=r'E:\GithubRepository\code_77329\dataset\pre', help='Input image/json directory.')
     run_p.add_argument('--output', '-o', default=r'E:\GithubRepository\code_77329\dataset\dataset1', help='Output base directory.')
     run_p.add_argument('--distance', '-d', type=float, default=50, help='Shrink distance.')
+    run_p.add_argument('--min-area-ratio', type=float, default=0.5, help='Minimum kept area ratio after shrinking (0-1).')
     run_p.add_argument('--spacing', '-s', type=float, default=2.0, help='Point spacing.')
+    run_p.add_argument('--sigma-scale', type=float, default=0.7, help='Sigma scale factor for shrink distance.')
+    run_p.add_argument('--sigma-min', type=float, default=0.5, help='Minimum sigma value.')
     run_p.add_argument('--alpha', '-a', type=float, default=0.5, help='Overlay alpha (0-1).')
     run_p.set_defaults(func=cmd_run)
 

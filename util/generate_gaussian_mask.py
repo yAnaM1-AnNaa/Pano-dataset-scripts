@@ -15,7 +15,14 @@ def remove_digits(text: str) -> str:
     return re.sub(r"\d", "", text)
 
 
-def generate_mask_from_json(json_path, output_path, distance_config: dict, config_key=None):
+def generate_mask_from_json(
+    json_path,
+    output_path,
+    distance_config: dict,
+    config_key=None,
+    sigma_scale=0.7,
+    sigma_min=0.5,
+):
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
@@ -40,7 +47,7 @@ def generate_mask_from_json(json_path, output_path, distance_config: dict, confi
 
         print(f"Generating mask '{label}': {len(points)} dots")
         shrink_dist = float(distance_config[config_key][idx])
-        sigma = max(0.5, shrink_dist * 0.7)
+        sigma = max(float(sigma_min), shrink_dist * float(sigma_scale))
         print(f"Generating '{label}': {len(points)} dots, dist={shrink_dist:.1f}, sigma={sigma:.2f}")
 
         shape_mask = np.zeros((image_height, image_width), dtype=np.float32)
@@ -62,7 +69,17 @@ def generate_mask_from_json(json_path, output_path, distance_config: dict, confi
     return True
 
 
-def process_folder(input_folder, output_folder, BASE_OBJ, SEEN_AFF, NOVEL_OBJ, UNSEEN_AFF, distance_config):
+def process_folder(
+    input_folder,
+    output_folder,
+    BASE_OBJ,
+    SEEN_AFF,
+    NOVEL_OBJ,
+    UNSEEN_AFF,
+    distance_config,
+    sigma_scale=0.7,
+    sigma_min=0.5,
+):
     os.makedirs(output_folder, exist_ok=True)
     json_files = []
     for root, _, files in os.walk(input_folder):
@@ -94,7 +111,14 @@ def process_folder(input_folder, output_folder, BASE_OBJ, SEEN_AFF, NOVEL_OBJ, U
             output_path = os.path.join(output_folder, output_filename)
 
         try:
-            if generate_mask_from_json(input_path, output_path, distance_config, config_key=rel_path):
+            if generate_mask_from_json(
+                input_path,
+                output_path,
+                distance_config,
+                config_key=rel_path,
+                sigma_scale=sigma_scale,
+                sigma_min=sigma_min,
+            ):
                 success_count += 1
             else:
                 fail_count += 1
@@ -109,7 +133,7 @@ def process_folder(input_folder, output_folder, BASE_OBJ, SEEN_AFF, NOVEL_OBJ, U
     print(f"Saved under: {output_folder}")
 
 
-def process_folder_simple(input_folder, output_folder, distance_config):
+def process_folder_simple(input_folder, output_folder, distance_config, sigma_scale=0.7, sigma_min=0.5):
     os.makedirs(output_folder, exist_ok=True)
     json_files = []
     for root, _, files in os.walk(input_folder):
@@ -131,7 +155,14 @@ def process_folder_simple(input_folder, output_folder, distance_config):
         output_filename = os.path.splitext(rel_path)[0] + ".png"
         output_path = os.path.join(output_folder, output_filename)
         try:
-            if generate_mask_from_json(input_path, output_path, distance_config, config_key=rel_path):
+            if generate_mask_from_json(
+                input_path,
+                output_path,
+                distance_config,
+                config_key=rel_path,
+                sigma_scale=sigma_scale,
+                sigma_min=sigma_min,
+            ):
                 success_count += 1
             else:
                 fail_count += 1
@@ -149,6 +180,8 @@ def main():
     parser.add_argument("--input", "-i", default="/root/autodl-tmp/OOAL/data/source/backrest")
     parser.add_argument("--output", "-o", default="./data/temps/GT")
     parser.add_argument("--config", "-c", default="./data/temps/GT/distance_config.json")
+    parser.add_argument("--sigma-scale", type=float, default=0.7, help="Sigma scale factor for shrink distance.")
+    parser.add_argument("--sigma-min", type=float, default=0.5, help="Minimum sigma value.")
     args = parser.parse_args()
 
     from data import BASE_OBJ, SEEN_AFF, NOVEL_OBJ, UNSEEN_AFF
@@ -159,7 +192,17 @@ def main():
 
     with open(args.config, "r", encoding="utf-8") as f:
         distance_config = json.load(f)
-    process_folder(args.input, args.output, BASE_OBJ, SEEN_AFF, NOVEL_OBJ, UNSEEN_AFF, distance_config)
+    process_folder(
+        args.input,
+        args.output,
+        BASE_OBJ,
+        SEEN_AFF,
+        NOVEL_OBJ,
+        UNSEEN_AFF,
+        distance_config,
+        sigma_scale=args.sigma_scale,
+        sigma_min=args.sigma_min,
+    )
 
 
 if __name__ == "__main__":

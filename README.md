@@ -1,8 +1,25 @@
 # Pano Dataset Scripts
+用于创建与AGD20K格式相同的数据集辅助脚本.
+输入格式:
+```text
+input/
+  object_001.jpg(RGB),
+  object_001.json(Polygon/Dots format labeled),
+  ...
+```
+输出格式:
+```text
+dataset_root/
+  Seen/
+    testset/
+      egocentric/
+        sit/chair/chair_001.jpg
+      GT/
+        sit/chair/chair_001.png
+```
+本仓库有 4 个主脚本：
 
-本仓库当前有 4 个主脚本：
-
-1. `pipeline.py`: 标注 JSON -> 中间结果 + mask + 叠加可视化
+1. `pipeline.py`: 标注 JSON -> 中间结果(polygon-shrinked polygon-dots) + mask + 叠加可视化
 2. `png2npy.py`: mask PNG -> 训练用 `.npy`
 3. `visualize_npy.py`: 检查 `.npy` 通道内容
 4. `util/reorganize_pipeline_output.py`: 将 pipeline 输出整理成 `dataset/Seen|Unseen/testset/...` 结构
@@ -26,7 +43,7 @@
 
 ### 用途
 
-从 Labelme 多边形 JSON 出发，执行：
+从 Labelme 多边形标注的 JSON 出发，执行：
 
 - `json-shrink`
 - `json-convert`（polygon -> points）
@@ -50,8 +67,6 @@ input_dir/
 ```
 
 ### 期望输出结构
-
-当前代码输出目录名为：
 
 ```text
 output_dir/
@@ -77,6 +92,7 @@ output_dir/
 - `GT`: mask PNG（单通道）
 - `Vis`: 叠加可视化 PNG
 - `Shrink_config.json`: 每个 JSON 的 shrink 参数记录
+- 可以通过修改额外的参数例如sigma和min-area-ratio来控制高热度区域的大小.
 
 ## 2 png2npy.py
 
@@ -87,7 +103,7 @@ output_dir/
 ### 示例
 
 ```bash
-python png2npy.py --png_folder <gt_root> --output_npy_dir <npy_root> --temp_folder <temp_dir>
+python png2npy.py --png_folder <gt_root> --output_npy_dir <npy_root>
 ```
 
 ### 输入要求
@@ -119,7 +135,7 @@ npy_root/
 
 ### `.npy` 格式
 
-- shape: `(C, H, W)`（通道优先）
+- shape: `(C, H, W)`（通道优先）,其中H,W可以通过参数修改
 - dtype: `float32`
 - `C` 为 affordance 通道数（默认来自 `SEEN_AFF`）
 - 通道顺序与 `util/data.py` 中 `SEEN_AFF` 一致
