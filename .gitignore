@@ -2,3 +2,5 @@ __pycache__/
 others/__pycache__/
 util/__pycache__/
 AGENTS.md
+dataset/
+*/DS_Store
