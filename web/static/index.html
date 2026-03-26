@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pano Dataset Web Demo</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <aside class="control-panel">
+        <div class="panel-header">
+          <p class="eyebrow">Pano Dataset Scripts</p>
+          <h1>Web Demo</h1>
+          <p class="subcopy">参数调整、文件上传和单样本运行入口。</p>
+        </div>
+
+        <section class="control-section">
+          <div id="field-distance" class="field field-slider"></div>
+          <div id="field-min_area_ratio" class="field"></div>
+          <div id="field-spacing" class="field field-slider"></div>
+          <div id="field-sigma_scale" class="field field-slider"></div>
+          <div id="field-sigma_min" class="field"></div>
+          <div id="field-alpha" class="field field-slider"></div>
+        </section>
+
+        <section class="upload-section">
+          <label class="upload-button">
+            <span>选择图片</span>
+            <input id="image-input" type="file" accept=".jpg,.jpeg,.png" />
+          </label>
+          <p id="image-file-name" class="file-name">尚未选择图片</p>
+
+          <label class="upload-button secondary">
+            <span>选择 JSON</span>
+            <input id="json-input" type="file" accept=".json,application/json" />
+          </label>
+          <p id="json-file-name" class="file-name">尚未选择 JSON</p>
+
+          <button id="run-button" class="run-button" type="button">Run</button>
+          <p class="upload-hint">要求图片和 JSON 文件同名，例如 <code>chair_001.jpg</code> 与 <code>chair_001.json</code>。</p>
+        </section>
+      </aside>
+
+      <main class="content-panel">
+        <section class="preview-card demo-card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Preview</p>
+              <h2>Polygon Parameter Demo</h2>
+            </div>
+            <p class="card-note"></p>
+          </div>
+          <div id="demo-stage" class="demo-stage"></div>
+        </section>
+
+        <section class="preview-card result-card">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Output</p>
+              <h2>Overlay Result</h2>
+            </div>
+            <p id="status-label" class="card-note">上传图片和 JSON 后点击 Run。</p>
+          </div>
+
+          <div class="progress-area">
+            <div class="progress-bar">
+              <div id="progress-fill" class="progress-fill"></div>
+            </div>
+            <p id="progress-text" class="progress-text">Idle</p>
+          </div>
+
+          <div id="result-stage" class="result-stage empty">
+            <p class="empty-copy">尚未运行。结果将显示在这里。</p>
+          </div>
+
+          <p id="error-text" class="error-text" hidden></p>
+          <details class="log-panel">
+            <summary>查看运行日志</summary>
+            <pre id="log-output">暂无日志。</pre>
+          </details>
+        </section>
+      </main>
+    </div>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
